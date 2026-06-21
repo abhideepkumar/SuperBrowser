@@ -10,7 +10,7 @@ import type {
   ChatOptions,
   ChatResult,
 } from "../types.js";
-import { log } from "../logger.js";
+import { serverLog } from "../logger.js";
 
 config();
 
@@ -116,7 +116,7 @@ export class NvidiaAdapter implements LLMProvider {
           const jitter = Math.random() * 500;
           const delay = Math.round(baseDelay + jitter);
 
-          log(
+          serverLog(
             "⏳",
             `[${this.name}] LLM call failed (attempt ${attempt}/${maxRetries}): ${errorMsg.trim()}. Retrying in ${delay}ms...`
           );

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "run_b14c5c2874a34de7",
+    "goal": "Go to https://books.toscrape.com/ and click on first book it shows and give me the current stock remaining",
+    "status": "done",
+    "startedAt": 1782083961529,
+    "totalSteps": 2,
+    "result": "22",
+    "events": [
+      {
+        "type": "started",
+        "result": null,
+        "runId": "run_b14c5c2874a34de7",
+        "timestamp": 1782083961544
+      },
+      {
+        "type": "step_started",
+        "step": 1,
+        "maxSteps": 20,
+        "runId": "run_b14c5c2874a34de7",
+        "timestamp": 1782083968978
+      },
+      {
+        "type": "snapshot_taken",
+        "step": 1,
+        "runId": "run_b14c5c2874a34de7",
+        "timestamp": 1782083969322
+      },
+      {
+        "type": "screenshot_taken",
+        "step": 1,
+        "screenshotPath": "C:\\Users\\itsab\\Desktop\\SuperBrowser\\screenshots\\run_b14c5c2874a34de7\\step_0.png",
+        "runId": "run_b14c5c2874a34de7",
+        "timestamp": 1782083969666
+      },
+      {
+        "type": "llm_planned",
+        "step": 1,
+        "reasoning": "The first book listed on the page is 'A Light in the Attic', which has a link with ref=e76. I will click on this link to navigate to the book's detail page, where the stock information should be available.",
+        "status": "continue",
+        "actions": [
+          {
+            "type": "click",
+            "ref": "@e76"
+          }
+        ],
+        "provider": "nvidia",
+        "model": "qwen/qwen3-next-80b-a3b-instruct",
+        "latencyMs": 2563,
+        "tokensUsed": {
+          "prompt": 2719,
+          "completion": 98,
+          "total": 2817
+        },
+        "usedVision": false,
+        "runId": "run_b14c5c2874a34de7",
+        "timestamp": 1782083972242
+      },
+      {
+        "type": "action_executing",
+        "actionType": "click",
+        "actionRef": "@e76",
+        "runId": "run_b14c5c2874a34de7",
+        "timestamp": 1782083972243
+      },
+      {
+        "type": "action_done",
+        "actionType": "click",
+        "actionRef": "@e76",
+        "actionSuccess": true,
+        "runId": "run_b14c5c2874a34de7",
+        "timestamp": 1782083972533
+      },
+      {
+        "type": "step_started",
+        "step": 2,
+        "maxSteps": 20,
+        "runId": "run_b14c5c2874a34de7",
+        "timestamp": 1782083975853
+      },
+      {
+        "type": "snapshot_taken",
+        "step": 2,
+        "runId": "run_b14c5c2874a34de7",
+        "timestamp": 1782083976128
+      },
+      {
+        "type": "screenshot_taken",
+        "step": 2,
+        "screenshotPath": "C:\\Users\\itsab\\Desktop\\SuperBrowser\\screenshots\\run_b14c5c2874a34de7\\step_1.png",
+        "runId": "run_b14c5c2874a34de7",
+        "timestamp": 1782083976479
+      },
+      {
+        "type": "llm_planned",
+        "step": 2,
+        "reasoning": "The page shows details of the book 'A Light in the Attic'. The stock information is clearly listed under the 'Availability' row, with the cell @e19 containing 'In stock (22 available)'. The goal is to retrieve the current stock remaining, which is 22.",
+        "status": "done",
+        "actions": [],
+        "provider": "nvidia",
+        "model": "qwen/qwen3-next-80b-a3b-instruct",
+        "latencyMs": 1990,
+        "tokensUsed": {
+          "prompt": 1021,
+          "completion": 90,
+          "total": 1111
+        },
+        "usedVision": false,
+        "runId": "run_b14c5c2874a34de7",
+        "timestamp": 1782083978476
+      },
+      {
+        "type": "done",
+        "result": "22",
+        "runId": "run_b14c5c2874a34de7",
+        "timestamp": 1782083978478
+      }
+    ],
+    "logFilePath": "C:\\Users\\itsab\\Desktop\\SuperBrowser\\logs\\run_run_b14c5c2874a34de7.log",
+    "finishedAt": 1782083979407
+  }
+]

@@ -2,12 +2,17 @@
 // This module is the bridge between the agent loop and the LLM adapters.
 // It handles: message building, vision fallback, JSON parsing, and logging.
 // All provider-specific logic lives in the adapters/ directory.
+//
+// DESIGN NOTE: The provider is NOT created at module load time. It is
+// instantiated lazily inside planActions() so that:
+//   1. A bad config throws an error (not process.exit) — safe in a server.
+//   2. The provider can be switched dynamically between runs.
 
 import * as fs from "fs";
 import * as path from "path";
 import { config } from "dotenv";
-import { createProvider, getProviderName } from "./adapters/factory.js";
-import { log, logLLMCall, logDetail } from "./logger.js";
+import { createProvider } from "./adapters/factory.js";
+import type { RunLogger } from "./logger.js";
 import type {
   LLMProvider,
   ChatMessage,
@@ -22,23 +27,9 @@ export type { AgentAction, LLMResponse };
 
 config();
 
-const MODEL = process.env.MODEL_NAME || "gpt-4o";
-const ENABLE_VISION =
-  (process.env.ENABLE_VISION || "true").toLowerCase() === "true";
-
-// Create the provider once at module load time
-let provider: LLMProvider;
-try {
-  provider = createProvider();
-} catch (err: any) {
-  console.error(`\n  ❌ Failed to initialize LLM provider: ${err.message}\n`);
-  process.exit(1);
-}
-
 /**
  * Build the messages array for the LLM request.
- * If includeImage is true and a valid screenshotPath is provided,
- * the annotated screenshot is attached as a base64 image.
+ * Supports optional vision (base64 screenshot attachment).
  */
 function buildMessages(
   systemPrompt: string,
@@ -49,13 +40,11 @@ function buildMessages(
 ): ChatMessage[] {
   const contentParts: ContentPart[] = [];
 
-  // Text content: the user goal + current snapshot
   contentParts.push({
     type: "text",
     text: `## USER GOAL\n${userGoal}\n\n## CURRENT PAGE SNAPSHOT\n${snapshotText}`,
   });
 
-  // Optionally attach the annotated screenshot as an image
   if (includeImage && screenshotPath && fs.existsSync(screenshotPath)) {
     const imageBuffer = fs.readFileSync(screenshotPath);
     const base64Image = imageBuffer.toString("base64");
@@ -66,7 +55,7 @@ function buildMessages(
       type: "image_url",
       image_url: {
         url: `data:${mimeType};base64,${base64Image}`,
-        detail: "low", // Use "low" to save tokens; switch to "high" if needed
+        detail: "low",
       },
     });
   }
@@ -78,31 +67,50 @@ function buildMessages(
 }
 
 /**
- * Call the LLM with the current page snapshot and optionally an annotated screenshot.
+ * Call the LLM with the current page snapshot and optionally a screenshot.
  * Returns a structured response with reasoning, actions, and status.
  *
- * If the model does not support vision (image input), the request is automatically
- * retried without the screenshot attachment.
+ * The LLM provider is created lazily here so that failures throw an Error
+ * instead of calling process.exit() — safe to call from a server context.
  *
- * @param step - The current step number (for logging)
+ * @param systemPrompt  - The system prompt
+ * @param userGoal      - The user's goal string
+ * @param snapshotText  - The AX tree snapshot text
+ * @param screenshotPath - Optional path to the annotated screenshot
+ * @param step          - The current step number (for logging)
+ * @param logger        - The per-run RunLogger instance
+ * @param providerOverride - Optional provider name to override LLM_PROVIDER env var
  */
 export async function planActions(
   systemPrompt: string,
   userGoal: string,
   snapshotText: string,
-  screenshotPath?: string,
-  step: number = 0
+  screenshotPath: string | undefined,
+  step: number,
+  logger: RunLogger,
+  providerOverride?: string
 ): Promise<LLMResponse> {
-  const useVision = ENABLE_VISION && !!screenshotPath;
+  // Lazy provider instantiation — throws, never exits
+  let provider: LLMProvider;
+  try {
+    provider = createProvider(providerOverride);
+  } catch (err: any) {
+    throw new Error(`Failed to initialize LLM provider: ${err.message}`);
+  }
+
+  const model = process.env.MODEL_NAME || "gpt-4o";
+  const enableVision =
+    (process.env.ENABLE_VISION || "true").toLowerCase() === "true";
+  const useVision = enableVision && !!screenshotPath;
 
   const chatOptions: ChatOptions = {
-    model: MODEL,
+    model,
     temperature: 0.1,
     max_tokens: 1024,
     response_format: { type: "json_object" },
   };
 
-  // Try with vision first, then fall back to text-only if the model rejects images
+  // Try with vision first; fall back to text-only if the model rejects images
   for (const includeImage of useVision ? [true, false] : [false]) {
     try {
       const messages = buildMessages(
@@ -115,8 +123,7 @@ export async function planActions(
 
       const result = await provider.chat(messages, chatOptions);
 
-      // Log the LLM call details to the log file
-      logLLMCall({
+      logger.logLLMCall({
         step,
         provider: result.provider,
         model: result.model,
@@ -130,7 +137,6 @@ export async function planActions(
 
       try {
         const parsed = JSON.parse(result.content) as LLMResponse;
-        // Validate required fields
         if (!parsed.status) parsed.status = "error";
         if (!parsed.actions) parsed.actions = [];
         if (!parsed.reasoning) parsed.reasoning = "No reasoning provided.";
@@ -159,11 +165,10 @@ export async function planActions(
     } catch (err: any) {
       const errorMsg = err.message || String(err);
 
-      // Log the failed LLM call
-      logLLMCall({
+      logger.logLLMCall({
         step,
         provider: provider.name,
-        model: MODEL,
+        model,
         vision: includeImage,
         inputSize: snapshotText.length,
         latencyMs: 0,
@@ -172,7 +177,6 @@ export async function planActions(
         error: errorMsg,
       });
 
-      // If the error is about image support, retry without the image
       const isVisionError =
         includeImage &&
         (errorMsg.includes("image input") ||
@@ -181,41 +185,39 @@ export async function planActions(
           errorMsg.includes("does not support"));
 
       if (isVisionError) {
-        log(
+        logger.log(
           "👁️",
           `Vision not supported by ${provider.name}. Falling back to text-only...`
         );
-        // Will retry the loop iteration with includeImage = false
         continue;
       }
 
-      // For any other error, throw it upward
       throw err;
     }
   }
 
-  // Should not reach here, but safety fallback
+  // Safety fallback (should never be reached)
   return {
-    reasoning: "Failed to get a response from the LLM after retries.",
+    reasoning: "Failed to get a response from the LLM after all attempts.",
     status: "error",
     actions: [],
     result: null,
     _raw: "",
     _usedVision: false,
-    _provider: provider.name,
+    _provider: provider!.name,
   };
 }
 
 /**
- * Get the name of the currently active LLM provider (for external logging).
+ * Get the name of the active LLM provider from env (for display).
  */
 export function getActiveProviderName(): string {
-  return provider.name;
+  return (process.env.LLM_PROVIDER || "openai").toLowerCase();
 }
 
 /**
- * Get the configured model name (for external logging).
+ * Get the configured model name (for display).
  */
 export function getModelName(): string {
-  return MODEL;
+  return process.env.MODEL_NAME || "gpt-4o";
 }
