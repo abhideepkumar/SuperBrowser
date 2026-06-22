@@ -4,20 +4,19 @@
 // H1 Fix: Store handler references so socket.off(event, handler) removes
 // ONLY our specific listeners, not all listeners on that event name.
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { connect } from "../services/socket";
 import { useAgentStore } from "../store/useAgentStore";
+import { useSettingsStore } from "../store/useSettingsStore";
 import type { AgentEvent } from "../types";
 
 export function useSocket() {
   const processEvent = useAgentStore((s) => s.processEvent);
   const setStatus = useAgentStore((s) => s.setStatus);
   const setInteractiveScreenshot = useAgentStore((s) => s.setInteractiveScreenshot);
-  const initialized = useRef(false);
+  const serverUrl = useSettingsStore((s) => s.serverUrl);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
 
     const socket = connect();
 
@@ -61,6 +60,22 @@ export function useSocket() {
       setStatus("aborted");
     };
 
+    const handleAskUser = (data: {
+      runId: string;
+      question: string;
+      options?: string[];
+      screenshotBase64?: string;
+    }) => {
+      processEvent({
+        type: "ask_user",
+        runId: data.runId,
+        question: data.question,
+        options: data.options,
+        screenshotBase64: data.screenshotBase64,
+        timestamp: Date.now(),
+      });
+    };
+
     // ── Register ──────────────────────────────────────────────────
     socket.on("agent:event", handleAgentEvent);
     socket.on("agent:done", handleDone);
@@ -69,6 +84,7 @@ export function useSocket() {
     socket.on("agent:resumed", handleResumed);
     socket.on("agent:interactive_update", handleInteractiveUpdate);
     socket.on("agent:aborted", handleAborted);
+    socket.on("agent:ask_user", handleAskUser);
 
     // ── Cleanup — removes ONLY our handlers (H1 fix) ──────────────
     return () => {
@@ -79,8 +95,7 @@ export function useSocket() {
       socket.off("agent:resumed", handleResumed);
       socket.off("agent:interactive_update", handleInteractiveUpdate);
       socket.off("agent:aborted", handleAborted);
-      initialized.current = false;
+      socket.off("agent:ask_user", handleAskUser);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [serverUrl, processEvent, setStatus, setInteractiveScreenshot]);
 }

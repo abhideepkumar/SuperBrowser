@@ -6,7 +6,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
-import { Clock, ChevronRight, Wifi, WifiOff } from "lucide-react-native";
+import { Clock, ChevronRight, Wifi, WifiOff, Settings as SettingsIcon } from "lucide-react-native";
 
 import { GlassCard } from "../components/GlassCard";
 import { GlowButton } from "../components/GlowButton";
@@ -95,7 +95,7 @@ export function DashboardScreen() {
               <Text style={styles.subtitle}>AI Browser Automation</Text>
             </View>
             <TouchableOpacity onPress={() => navigation.navigate("Settings")} style={styles.settingsBtn}>
-              <Text style={{ color: Colors.textSecondary, fontSize: 20 }}>⚙️</Text>
+              <SettingsIcon size={18} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -197,43 +197,43 @@ export function DashboardScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { padding: 20, paddingTop: 60 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
-  title: { color: Colors.textPrimary, fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
-  subtitle: { color: Colors.textMuted, fontSize: 14, marginTop: 2 },
-  settingsBtn: { padding: 8 },
-  statusCard: { marginBottom: 12 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 },
+  title: { color: Colors.textPrimary, fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
+  subtitle: { color: Colors.textMuted, fontSize: 13, marginTop: 1 },
+  settingsBtn: { padding: 8, backgroundColor: "#FFFFFF", borderRadius: 10, borderWidth: 1, borderColor: Colors.border },
+  statusCard: { marginBottom: 16 },
   statusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   statusLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   statusText: { color: Colors.textPrimary, fontWeight: "600", fontSize: 14 },
-  statusSub: { color: Colors.textMuted, fontSize: 11, marginTop: 1 },
-  activeCard: { marginBottom: 12, borderColor: Colors.purple + "55" },
+  statusSub: { color: Colors.textMuted, fontSize: 12, marginTop: 1 },
+  activeCard: { marginBottom: 16, borderColor: Colors.purple + "33" },
   activeRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   activeGoal: { flex: 1, color: Colors.textSecondary, fontSize: 13 },
   stepCount: { color: Colors.purple, fontSize: 12, fontWeight: "600" },
-  inputCard: { marginBottom: 20 },
+  inputCard: { marginBottom: 24 },
   inputLabel: { color: Colors.textSecondary, fontSize: 13, fontWeight: "600", marginBottom: 10 },
   textInput: {
     color: Colors.textPrimary, fontSize: 14, lineHeight: 22,
     minHeight: 90, maxHeight: 160,
-    backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 10,
-    padding: 12, borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: "#F1F5F9", borderRadius: 12,
+    padding: 14, borderWidth: 1, borderColor: Colors.border,
     marginBottom: 12, textAlignVertical: "top",
   },
   runBtn: { marginTop: 4 },
-  sectionLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginBottom: 10 },
+  sectionLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginBottom: 10 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  seeAll: { color: Colors.cyan, fontSize: 13 },
+  seeAll: { color: Colors.cyan, fontSize: 13, fontWeight: "600" },
   playbooksRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 24 },
   playbookChip: {
-    paddingHorizontal: 14, paddingVertical: 9,
-    borderRadius: 20, backgroundColor: Colors.bgGlass,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 20, backgroundColor: "#FFFFFF",
     borderWidth: 1, borderColor: Colors.border,
   },
-  playbookLabel: { color: Colors.textSecondary, fontSize: 13 },
+  playbookLabel: { color: Colors.textSecondary, fontSize: 13, fontWeight: "500" },
   runCard: { marginBottom: 8 },
   runRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  runGoal: { color: Colors.textPrimary, fontSize: 13, fontWeight: "500", marginBottom: 4 },
+  runGoal: { color: Colors.textPrimary, fontSize: 13, fontWeight: "600", marginBottom: 4 },
   runMeta: { flexDirection: "row", alignItems: "center", gap: 6 },
   runTime: { color: Colors.textMuted, fontSize: 11 },
   runSteps: { color: Colors.textMuted, fontSize: 11 },

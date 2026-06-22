@@ -22,8 +22,12 @@ export function getSocket(): Socket {
 export function connect(): Socket {
   const { serverUrl } = useSettingsStore.getState();
 
-  // If connected to the right URL, reuse
-  if (socket?.connected && connectedUrl === serverUrl) return socket;
+  // If we already have a socket for this URL, reuse it.
+  // Trust socket.io to handle reconnections internally.
+  if (socket && connectedUrl === serverUrl) {
+    if (!socket.connected) socket.connect();
+    return socket;
+  }
 
   // URL changed or socket dropped — rebuild
   if (socket) {
@@ -44,10 +48,6 @@ export function connect(): Socket {
   socket.on("connect", () => console.log("[Socket] Connected:", socket?.id));
   socket.on("disconnect", (reason) => {
     console.log("[Socket] Disconnected:", reason);
-    // On clean disconnect triggered by us, don't mark as stale
-    if (reason !== "io client disconnect") {
-      connectedUrl = null; // force reconnect on next connect()
-    }
   });
   socket.on("connect_error", (err) => console.error("[Socket] Error:", err.message));
 
@@ -87,6 +87,10 @@ export function sendClick(xFrac: number, yFrac: number): void {
 
 export function sendType(text: string): void {
   getSocket().emit("client:type", { text });
+}
+
+export function sendUserResponse(answer: string): void {
+  getSocket().emit("client:user_response", { answer });
 }
 
 // Automatically reconnect when serverUrl changes in settings

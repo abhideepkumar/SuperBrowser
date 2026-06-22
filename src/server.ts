@@ -40,6 +40,11 @@ interface ActiveSession {
   socketId: string;
   paused: boolean;
   abortController: AbortController;
+  /** Resolves when the user responds to an ask_user question */
+  pendingUserResponse: {
+    resolve: (answer: string) => void;
+    question: string;
+  } | null;
 }
 
 // ─── State ───────────────────────────────────────────────────────
@@ -282,6 +287,7 @@ io.on("connection", (socket: Socket) => {
       socketId: socket.id,
       paused: false,
       abortController,
+      pendingUserResponse: null,
     };
     activeSessions.set(socket.id, session);
 
@@ -318,6 +324,22 @@ io.on("connection", (socket: Socket) => {
 
         // Update step count
         if (event.step) record.totalSteps = event.step;
+      },
+
+      onAskUser: async (question: string, options?: string[]) => {
+        return new Promise<string>((resolve) => {
+          // Store the resolve function so client:user_response can call it
+          session.pendingUserResponse = { resolve, question };
+
+          // Send the question to the mobile client as a dedicated event
+          socket.emit("agent:ask_user", {
+            runId,
+            question,
+            options: options ?? [],
+          });
+
+          serverLog("❓", `Run ${runId} asking user: "${question.substring(0, 60)}..."`);
+        });
       },
     };
 
@@ -482,6 +504,23 @@ io.on("connection", (socket: Socket) => {
       error: result.error,
       screenshotBase64,
     });
+  });
+
+  // ── client:user_response (Feedback loop — user answers LLM question) ──
+  socket.on("client:user_response", (data: { answer: string }) => {
+    const session = activeSessions.get(socket.id);
+    if (!session?.pendingUserResponse) {
+      socket.emit("server:error", {
+        message: "No pending question to answer.",
+      });
+      return;
+    }
+
+    serverLog("💬", `User responded to run ${session.runId}: "${data.answer.substring(0, 60)}..."`);
+
+    // Resolve the Promise that the agent loop is awaiting
+    session.pendingUserResponse.resolve(data.answer);
+    session.pendingUserResponse = null;
   });
 
   // ── disconnect ───────────────────────────────────────────────

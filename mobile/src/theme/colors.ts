@@ -2,46 +2,45 @@
 
 export const Colors = {
   // Backgrounds
-  bg: "#070B14",
-  bgCard: "rgba(255,255,255,0.04)",
-  bgGlass: "rgba(255,255,255,0.07)",
-  bgGlassStrong: "rgba(255,255,255,0.12)",
+  bg: "#F8FAFC",
+  bgCard: "#FFFFFF",
+  bgGlass: "rgba(255,255,255,0.85)",
+  bgGlassStrong: "rgba(255,255,255,0.95)",
 
   // Borders
-  border: "rgba(255,255,255,0.10)",
-  borderGlow: "rgba(99,179,237,0.35)",
+  border: "#E2E8F0",
+  borderGlow: "rgba(59, 130, 246, 0.12)",
 
-  // Neon accents
-  cyan: "#63B3ED",
-  cyanGlow: "rgba(99,179,237,0.20)",
-  purple: "#B794F4",
-  purpleGlow: "rgba(183,148,244,0.20)",
-  green: "#68D391",
-  greenGlow: "rgba(104,211,145,0.20)",
-  red: "#FC8181",
-  redGlow: "rgba(252,129,129,0.20)",
-  amber: "#F6AD55",
+  // Neon accents -> Refined solid accents
+  cyan: "#3B82F6",
+  cyanGlow: "rgba(59, 130, 246, 0.08)",
+  purple: "#6366F1",
+  purpleGlow: "rgba(99, 102, 241, 0.08)",
+  green: "#10B981",
+  greenGlow: "rgba(16, 185, 129, 0.08)",
+  red: "#EF4444",
+  redGlow: "rgba(239, 68, 68, 0.08)",
+  amber: "#F59E0B",
 
   // Text
-  textPrimary: "#F7FAFC",
-  textSecondary: "#A0AEC0",
-  textMuted: "#4A5568",
-  textCyan: "#63B3ED",
-  textPurple: "#B794F4",
+  textPrimary: "#0F172A",
+  textSecondary: "#334155",
+  textMuted: "#64748B",
+  textCyan: "#2563EB",
+  textPurple: "#4F46E5",
 
   // Gradient stops
-  gradientStart: "#070B14",
-  gradientMid: "#0D1526",
-  gradientEnd: "#111827",
+  gradientStart: "#F8FAFC",
+  gradientMid: "#F1F5F9",
+  gradientEnd: "#E2E8F0",
 } as const;
 
 // expo-linear-gradient v13+ requires readonly tuples, not plain string[].
-// Using 'as const' at the tuple level satisfies readonly [ColorValue, ColorValue, ...ColorValue[]].
 export const Gradients = {
   background: [Colors.gradientStart, Colors.gradientMid, Colors.gradientEnd] as const,
-  cyan: ["rgba(99,179,237,0.15)", "rgba(99,179,237,0)"] as const,
-  purple: ["rgba(183,148,244,0.15)", "rgba(183,148,244,0)"] as const,
-  runButton: ["#2B6CB0", "#553C9A"] as const,
-  success: ["#276749", "#2F855A"] as const,
-  error: ["#742A2A", "#9B2C2C"] as const,
+  cyan: ["rgba(59, 130, 246, 0.06)", "rgba(59, 130, 246, 0)"] as const,
+  purple: ["rgba(99, 102, 241, 0.06)", "rgba(99, 102, 241, 0)"] as const,
+  runButton: ["#0F172A", "#1E293B"] as const, // Premium dark charcoal solid look
+  success: ["#10B981", "#059669"] as const,
+  error: ["#EF4444", "#DC2626"] as const,
 } as const;

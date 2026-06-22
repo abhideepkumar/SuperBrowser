@@ -28,6 +28,8 @@ export type AgentEventType =
   | "action_done"
   | "paused"
   | "resumed"
+  | "ask_user"
+  | "user_responded"
   | "done"
   | "error"
   | "max_steps_reached";
@@ -54,6 +56,12 @@ export interface AgentEvent {
   usedVision?: boolean;
   result?: string | null;
   error?: string;
+  /** The question text (for ask_user events) */
+  question?: string;
+  /** Optional suggested answer choices (for ask_user events) */
+  options?: string[];
+  /** The user's response (for user_responded events) */
+  userAnswer?: string;
   timestamp: number;
 }
 
@@ -86,6 +94,13 @@ export interface AgentRunConfig {
   abortSignal?: AbortSignal;
   /** Optional LLM provider override (overrides LLM_PROVIDER env var) */
   providerOverride?: string;
+  /**
+   * Called when the LLM asks the user a question (status: "ask_user").
+   * The agent loop will AWAIT the returned Promise — it must resolve
+   * with the user's answer string. The answer is then injected into
+   * the next LLM planning call as additional context.
+   */
+  onAskUser?: (question: string, options?: string[]) => Promise<string>;
 }
 
 export interface AgentRunResult {
@@ -343,6 +358,8 @@ export async function runAgent(runConfig: AgentRunConfig): Promise<AgentRunResul
   // ─── Main Loop ─────────────────────────────────────────────────
     let consecutiveSnapshotFailures = 0;
     const MAX_SNAPSHOT_FAILURES = 3;
+    /** Holds the user's answer to inject into the next LLM call */
+    let pendingUserAnswer: string | null = null;
 
     for (let step = 0; step < maxSteps; step++) {
     // Check abort signal
@@ -419,12 +436,19 @@ export async function runAgent(runConfig: AgentRunConfig): Promise<AgentRunResul
     });
 
     // Truncate long snapshots to avoid token overflow
-    const snapshotText =
+    let snapshotText =
       snap.output.length > 8000
         ? snap.output.substring(0, 8000) + "\n\n[... snapshot truncated for token limit ...]"
         : snap.output;
 
-    logger.log("📝", `Snapshot length: ${snap.output.length} chars`);
+    // Inject the user's answer from a previous ask_user round
+    if (pendingUserAnswer) {
+      snapshotText += `\n\n## USER RESPONSE\nThe user answered your previous question: "${pendingUserAnswer}"`;
+      logger.log("💬", `Injecting user answer into LLM context: "${pendingUserAnswer}"`);
+      pendingUserAnswer = null; // consume it
+    }
+
+    logger.log("📝", `Snapshot length: ${snapshotText.length} chars`);
     logger.logDetail("AX TREE SNAPSHOT", snap.output);
 
     // --- Phase 2: Plan ---
@@ -498,6 +522,49 @@ export async function runAgent(runConfig: AgentRunConfig): Promise<AgentRunResul
         reason: "error",
         error: response.reasoning,
       };
+    }
+
+    // --- Check: LLM is asking the user a question ---
+    if (response.status === "ask_user") {
+      const question = response.result ?? response.reasoning;
+      const options = response.options;
+
+      logger.logSection("❓ ASKING USER");
+      logger.log("🗣️", `Question: ${question}`);
+      if (options?.length) {
+        logger.log("📋", `Options: ${options.join(", ")}`);
+      }
+
+      emit(runConfig, {
+        type: "ask_user",
+        step: step + 1,
+        question,
+        options,
+        screenshotBase64,
+        reasoning: response.reasoning,
+      });
+
+      // Suspend the loop — wait for the user's answer
+      let userAnswer = "";
+      if (runConfig.onAskUser) {
+        userAnswer = await runConfig.onAskUser(question, options);
+      } else {
+        // No handler registered (e.g. CLI mode) — skip with a default
+        logger.log("⚠️", "No onAskUser handler registered. Skipping question.");
+        userAnswer = "(no response — please proceed with your best judgment)";
+      }
+
+      logger.log("💬", `User answered: ${userAnswer}`);
+      emit(runConfig, {
+        type: "user_responded",
+        step: step + 1,
+        question,
+        userAnswer,
+      });
+
+      // Store the answer so it gets injected into the NEXT LLM call
+      pendingUserAnswer = userAnswer;
+      continue; // Go to next iteration — re-snapshot + plan with the answer
     }
 
     // --- Phase 3: Execute ---

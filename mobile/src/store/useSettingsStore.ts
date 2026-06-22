@@ -9,10 +9,12 @@ interface SettingsState {
   provider: string;
   model: string;
   loaded: boolean;
+  hasCompletedOnboarding: boolean;
 
   setServerUrl: (url: string) => Promise<void>;
   setProvider: (p: string) => void;
   setModel: (m: string) => void;
+  setCompletedOnboarding: (completed: boolean) => Promise<void>;
   loadSettings: () => Promise<void>;
 }
 
@@ -23,6 +25,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   provider: "openai",
   model: "gpt-4o",
   loaded: false,
+  hasCompletedOnboarding: false,
 
   setServerUrl: async (url: string) => {
     set({ serverUrl: url });
@@ -31,6 +34,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   setProvider: (p) => set({ provider: p }),
   setModel: (m) => set({ model: m }),
+
+  setCompletedOnboarding: async (completed) => {
+    set({ hasCompletedOnboarding: completed });
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...get(), hasCompletedOnboarding: completed }));
+  },
 
   loadSettings: async () => {
     try {

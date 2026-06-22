@@ -30,16 +30,20 @@ interface AgentState {
   screenshotBase64: string | null;
   // Interactive fallback
   interactiveScreenshot: string | null;
+  // Feedback loop
+  pendingQuestion: string | null;
+  pendingOptions: string[];
 
   // Actions
   startRun: (goal: string) => void;
   setStatus: (status: RunStatus) => void;
   processEvent: (event: AgentEvent) => void;
   setInteractiveScreenshot: (base64: string | null) => void;
+  clearPendingQuestion: () => void;
   reset: () => void;
 }
 
-const INITIAL: Omit<AgentState, "startRun" | "setStatus" | "processEvent" | "setInteractiveScreenshot" | "reset"> = {
+const INITIAL: Omit<AgentState, "startRun" | "setStatus" | "processEvent" | "setInteractiveScreenshot" | "clearPendingQuestion" | "reset"> = {
   runId: null,
   goal: "",
   status: "idle",
@@ -51,6 +55,8 @@ const INITIAL: Omit<AgentState, "startRun" | "setStatus" | "processEvent" | "set
   steps: [],
   screenshotBase64: null,
   interactiveScreenshot: null,
+  pendingQuestion: null,
+  pendingOptions: [],
 };
 
 export const useAgentStore = create<AgentState>((set, get) => ({
@@ -139,6 +145,25 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         set({ status: "running" });
         break;
 
+      case "ask_user":
+        set({
+          status: "waiting_for_user",
+          pendingQuestion: event.question ?? "The agent needs your input.",
+          pendingOptions: event.options ?? [],
+        });
+        if (event.screenshotBase64) {
+          set({ screenshotBase64: event.screenshotBase64 });
+        }
+        break;
+
+      case "user_responded":
+        set({
+          status: "running",
+          pendingQuestion: null,
+          pendingOptions: [],
+        });
+        break;
+
       case "done":
         set({ status: "done", result: event.result ?? null });
         break;
@@ -154,6 +179,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   },
 
   setInteractiveScreenshot: (base64) => set({ interactiveScreenshot: base64 }),
+
+  clearPendingQuestion: () => set({ pendingQuestion: null, pendingOptions: [] }),
 
   reset: () => set({ ...INITIAL }),
 }));

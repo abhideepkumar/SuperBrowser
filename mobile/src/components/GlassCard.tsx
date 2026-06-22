@@ -27,22 +27,20 @@ export function GlassCard({
   children,
   style,
   innerStyle,
-  intensity = 20,
+  intensity = 10,
   glowColor,
 }: Props) {
-  const glowShadow: ViewStyle | undefined = glowColor
-    ? {
-        shadowColor: glowColor,
-        shadowOpacity: 0.35,
-        shadowRadius: 16,
-        shadowOffset: { width: 0, height: 0 },
-        elevation: 8,
-      }
-    : undefined;
+  const glowShadow: ViewStyle = {
+    shadowColor: glowColor ?? "#0F172A",
+    shadowOpacity: glowColor ? 0.08 : 0.04,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  };
 
   return (
     <View style={[styles.wrapper, glowShadow, style]}>
-      <BlurView intensity={intensity} tint="dark" style={styles.blur}>
+      <BlurView intensity={intensity} tint="light" style={styles.blur}>
         <View style={[styles.inner, innerStyle]}>{children}</View>
       </BlurView>
     </View>
@@ -55,6 +53,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: Colors.border,
+    backgroundColor: Colors.bgCard,
     // Required on Android — BlurView needs a measurable container
     ...(Platform.OS === "android" ? { minHeight: 1 } : {}),
   },
@@ -63,7 +62,6 @@ const styles = StyleSheet.create({
     // Use undefined and let content drive height.
   },
   inner: {
-    backgroundColor: Colors.bgGlass,
     padding: 16,
   },
 });

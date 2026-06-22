@@ -10,6 +10,8 @@ export type AgentEventType =
   | "action_done"
   | "paused"
   | "resumed"
+  | "ask_user"
+  | "user_responded"
   | "done"
   | "error"
   | "max_steps_reached";
@@ -35,7 +37,13 @@ export interface AgentEvent {
   usedVision?: boolean;
   result?: string | null;
   error?: string;
+  /** The question text (for ask_user events) */
+  question?: string;
+  /** Optional suggested answer choices (for ask_user events) */
+  options?: string[];
+  /** The user's response (for user_responded events) */
+  userAnswer?: string;
   timestamp: number;
 }
 
-export type RunStatus = "idle" | "running" | "paused" | "done" | "error" | "aborted" | "max_steps";
+export type RunStatus = "idle" | "running" | "paused" | "waiting_for_user" | "done" | "error" | "aborted" | "max_steps";

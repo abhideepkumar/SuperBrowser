@@ -1,6 +1,6 @@
 // src/components/TerminalRow.tsx — One step in the reasoning timeline
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from "react-native";
 import { Colors } from "../theme/colors";
 
 interface Action {
@@ -90,33 +90,47 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     padding: 12,
     backgroundColor: Colors.bgCard,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.border,
     gap: 10,
+    // Soft shadow for log headers
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
   stepBadge: {
     width: 24, height: 24, borderRadius: 12,
-    backgroundColor: Colors.cyanGlow,
-    borderWidth: 1, borderColor: Colors.cyan,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1, borderColor: "#BFDBFE",
     alignItems: "center", justifyContent: "center",
   },
-  stepNum: { color: Colors.cyan, fontSize: 11, fontWeight: "700" },
-  reasoning: { flex: 1, color: Colors.textSecondary, fontSize: 13, lineHeight: 18 },
-  chevron: { color: Colors.textMuted, fontSize: 10 },
+  stepNum: { color: "#1E40AF", fontSize: 11, fontWeight: "700" },
+  reasoning: { flex: 1, color: Colors.textPrimary, fontSize: 13, lineHeight: 18 },
+  chevron: { color: Colors.textMuted, fontSize: 10, marginTop: 4 },
   body: {
-    marginTop: 2, marginLeft: 34,
-    backgroundColor: Colors.bgCard,
-    borderRadius: 8, padding: 10,
+    marginTop: 4, marginLeft: 34,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 8, padding: 12,
     borderWidth: 1, borderColor: Colors.border,
   },
   metaRow: { flexDirection: "row", gap: 12, marginBottom: 8 },
   meta: { color: Colors.textMuted, fontSize: 11 },
-  section: { gap: 4 },
+  section: { gap: 6 },
   actionRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   actionIcon: { fontSize: 13 },
-  actionText: { color: Colors.textSecondary, fontSize: 12, fontFamily: "monospace" },
+  actionText: {
+    color: "#0F172A",
+    fontSize: 12,
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+    backgroundColor: "#E2E8F0",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
   successIcon: { fontSize: 13 },
   failIcon: { fontSize: 13 },
-  connector: { width: 2, height: 8, backgroundColor: Colors.border, marginLeft: 23 },
+  connector: { width: 2, height: 8, backgroundColor: "#E2E8F0", marginLeft: 23 },
 });

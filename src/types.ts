@@ -84,9 +84,11 @@ export interface AgentAction {
  */
 export interface LLMResponse {
   reasoning: string;
-  status: "continue" | "done" | "error";
+  status: "continue" | "done" | "error" | "ask_user";
   actions: AgentAction[];
   result: string | null;
+  /** Optional suggested answer choices (for ask_user status) */
+  options?: string[];
   /** The raw string returned by the LLM (for logging) */
   _raw?: string;
   /** Whether the screenshot was actually used in the request */

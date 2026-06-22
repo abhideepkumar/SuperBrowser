@@ -13,12 +13,14 @@ import { LiveViewScreen } from "./src/screens/LiveViewScreen";
 import { HistoryScreen } from "./src/screens/HistoryScreen";
 import { HistoryDetailScreen } from "./src/screens/HistoryDetailScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
+import { OnboardingScreen } from "./src/screens/OnboardingScreen";
 import { Colors } from "./src/theme/colors";
 import { useSettingsStore } from "./src/store/useSettingsStore";
 import { useSocket } from "./src/hooks/useSocket";
 
 // ── Navigation types ─────────────────────────────────────────────
 export type RootStackParamList = {
+  Onboarding: undefined;
   Tabs: undefined;
   LiveView: undefined;
   HistoryDetail: { runId: string };
@@ -32,13 +34,13 @@ export type TabParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
-// Dark navigation theme
+// Light navigation theme
 const NavTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
     background: Colors.bg,
-    card: "rgba(7,11,20,0.95)",
+    card: "#FFFFFF",
     text: Colors.textPrimary,
     border: Colors.border,
     primary: Colors.cyan,
@@ -54,12 +56,16 @@ function MainTabs() {
         headerShown: false,
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: "rgba(7,11,20,0.92)",
+          backgroundColor: "rgba(255,255,255,0.95)",
           borderTopColor: Colors.border,
           borderTopWidth: 1,
           height: Platform.OS === "ios" ? 84 : 64,
           paddingBottom: Platform.OS === "ios" ? 24 : 8,
-          elevation: 0,
+          elevation: 8,
+          shadowColor: "#0F172A",
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.04,
+          shadowRadius: 12,
         },
         tabBarActiveTintColor: Colors.cyan,
         tabBarInactiveTintColor: Colors.textMuted,
@@ -89,7 +95,7 @@ function SocketConnector() {
 
 // ── Root App ─────────────────────────────────────────────────────
 export default function App() {
-  const { loadSettings, loaded } = useSettingsStore();
+  const { loadSettings, loaded, hasCompletedOnboarding } = useSettingsStore();
 
   useEffect(() => {
     loadSettings();
@@ -100,7 +106,7 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <StatusBar barStyle="light-content" backgroundColor={Colors.bg} />
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.bg} />
         <NavigationContainer theme={NavTheme}>
           <SocketConnector />
           <Stack.Navigator
@@ -110,30 +116,36 @@ export default function App() {
               animation: "slide_from_right",
             }}
           >
-            <Stack.Screen name="Tabs" component={MainTabs} />
-            <Stack.Screen
-              name="LiveView"
-              component={LiveViewScreen}
-              options={{
-                headerShown: true,
-                title: "Live Agent View",
-                headerStyle: { backgroundColor: Colors.bg },
-                headerTintColor: Colors.textPrimary,
-                headerTitleStyle: { fontWeight: "700" },
-                animation: "slide_from_bottom",
-              }}
-            />
-            <Stack.Screen
-              name="HistoryDetail"
-              component={HistoryDetailScreen}
-              options={{
-                headerShown: true,
-                title: "Run Detail",
-                headerStyle: { backgroundColor: Colors.bg },
-                headerTintColor: Colors.textPrimary,
-                headerTitleStyle: { fontWeight: "700" },
-              }}
-            />
+            {!hasCompletedOnboarding ? (
+              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            ) : (
+              <>
+                <Stack.Screen name="Tabs" component={MainTabs} />
+                <Stack.Screen
+                  name="LiveView"
+                  component={LiveViewScreen}
+                  options={{
+                    headerShown: true,
+                    title: "Live Agent View",
+                    headerStyle: { backgroundColor: Colors.bg },
+                    headerTintColor: Colors.textPrimary,
+                    headerTitleStyle: { fontWeight: "700" },
+                    animation: "slide_from_bottom",
+                  }}
+                />
+                <Stack.Screen
+                  name="HistoryDetail"
+                  component={HistoryDetailScreen}
+                  options={{
+                    headerShown: true,
+                    title: "Run Detail",
+                    headerStyle: { backgroundColor: Colors.bg },
+                    headerTintColor: Colors.textPrimary,
+                    headerTitleStyle: { fontWeight: "700" },
+                  }}
+                />
+              </>
+            )}
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>

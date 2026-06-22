@@ -103,7 +103,7 @@ export function screenshot(
     fs.mkdirSync(dir, { recursive: true });
   }
   return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} screenshot "${savePath}"`,
+    `agent-browser ${sessionFlag(sessionId)} screenshot --annotate "${savePath}"`,
     15000
   );
 }
@@ -158,9 +158,8 @@ export function scroll(
   direction: "up" | "down" = "down",
   sessionId: string = "default"
 ): Promise<BrowserResult> {
-  const px = direction === "down" ? 600 : -600;
   return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} execute "window.scrollBy(0, ${px})"`,
+    `agent-browser ${sessionFlag(sessionId)} scroll ${direction} 600`,
     10000
   );
 }

@@ -17,9 +17,11 @@ interface Props {
 
 export function GlowButton({ label, onPress, variant = "primary", loading, disabled, style, icon }: Props) {
   const gradientColors: [string, string] =
-    variant === "danger" ? ["#742A2A", "#9B2C2C"]
-    : variant === "ghost" ? ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.08)"]
-    : ["#2B6CB0", "#553C9A"];
+    variant === "danger" ? ["#EF4444", "#DC2626"]
+    : variant === "ghost" ? ["#F1F5F9", "#E2E8F0"]
+    : ["#0F172A", "#1E293B"]; // Dark Charcoal Premium Primary Look
+
+  const isGhost = variant === "ghost";
 
   const handlePress = () => {
     if (disabled || loading) return;
@@ -32,15 +34,26 @@ export function GlowButton({ label, onPress, variant = "primary", loading, disab
       onPress={handlePress}
       activeOpacity={0.8}
       disabled={disabled || loading}
-      style={[styles.wrapper, disabled && styles.disabled, style]}
+      style={[
+        styles.wrapper,
+        isGhost && styles.ghostBorder,
+        disabled && styles.disabled,
+        style
+      ]}
     >
       <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradient}>
         {loading ? (
-          <ActivityIndicator size="small" color={Colors.textPrimary} />
+          <ActivityIndicator size="small" color={isGhost ? Colors.textSecondary : "#FFFFFF"} />
         ) : (
           <>
             {icon}
-            <Text style={[styles.label, icon ? { marginLeft: 6 } : undefined]}>{label}</Text>
+            <Text style={[
+              styles.label,
+              { color: isGhost ? Colors.textSecondary : "#FFFFFF" },
+              icon ? { marginLeft: 6 } : undefined
+            ]}>
+              {label}
+            </Text>
           </>
         )}
       </LinearGradient>
@@ -52,10 +65,15 @@ const styles = StyleSheet.create({
   wrapper: {
     borderRadius: 12,
     overflow: "hidden",
-    shadowColor: Colors.cyan,
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  ghostBorder: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
   },
   gradient: {
     flexDirection: "row",
@@ -65,10 +83,9 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   label: {
-    color: Colors.textPrimary,
-    fontWeight: "700",
-    fontSize: 15,
-    letterSpacing: 0.5,
+    fontWeight: "600",
+    fontSize: 14,
+    letterSpacing: 0.2,
   },
   disabled: { opacity: 0.4 },
 });

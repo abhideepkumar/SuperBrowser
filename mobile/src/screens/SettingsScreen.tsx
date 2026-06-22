@@ -143,8 +143,8 @@ export function SettingsScreen() {
             <Switch
               value={vision}
               onValueChange={setVision}
-              trackColor={{ false: Colors.bgGlass, true: Colors.cyanGlow }}
-              thumbColor={vision ? Colors.cyan : Colors.textMuted}
+              trackColor={{ false: "#E2E8F0", true: "#BFDBFE" }}
+              thumbColor={vision ? Colors.cyan : "#94A3B8"}
             />
           </View>
 
@@ -205,25 +205,26 @@ export function SettingsScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { padding: 20 },
-  title: { color: Colors.textPrimary, fontSize: 24, fontWeight: "800", marginBottom: 24 },
-  sectionLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, marginTop: 4 },
+  title: { color: Colors.textPrimary, fontSize: 24, fontWeight: "800", letterSpacing: -0.5, marginBottom: 24 },
+  sectionLabel: { color: Colors.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginBottom: 10, marginTop: 8 },
   card: { marginBottom: 20 },
   fieldLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600", marginBottom: 6 },
-  fieldDesc: { color: Colors.textMuted, fontSize: 12, lineHeight: 17, marginBottom: 8 },
+  fieldDesc: { color: Colors.textMuted, fontSize: 12, lineHeight: 17, marginBottom: 10 },
   input: {
     color: Colors.textPrimary, fontSize: 14,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    borderRadius: 10, padding: 12,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12, padding: 14,
     borderWidth: 1, borderColor: Colors.border,
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  pingRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  pingRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   providerRow: {
     flexDirection: "row", alignItems: "center", gap: 12,
-    paddingVertical: 10, paddingHorizontal: 4,
-    borderRadius: 8,
+    paddingVertical: 12, paddingHorizontal: 8,
+    borderRadius: 10,
+    marginBottom: 4,
   },
-  providerSelected: { backgroundColor: Colors.cyanGlow },
+  providerSelected: { backgroundColor: "#EFF6FF" },
   radioOuter: {
     width: 20, height: 20, borderRadius: 10,
     borderWidth: 2, borderColor: Colors.textMuted,
@@ -232,6 +233,6 @@ const styles = StyleSheet.create({
   radioOuterSelected: { borderColor: Colors.cyan },
   radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.cyan },
   providerLabel: { color: Colors.textSecondary, fontSize: 14, fontWeight: "500" },
-  switchRow: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 10 },
+  switchRow: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 12 },
   hint: { color: Colors.textMuted, fontSize: 11, lineHeight: 16, marginTop: 16, textAlign: "center" },
 });

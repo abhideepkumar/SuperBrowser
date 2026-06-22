@@ -21,7 +21,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { TerminalRow } from "../components/TerminalRow";
 import { Colors, Gradients } from "../theme/colors";
 import { useAgentStore } from "../store/useAgentStore";
-import { pauseRun, resumeRun, stopRun, sendClick, sendType } from "../services/socket";
+import { pauseRun, resumeRun, stopRun, sendClick, sendType, sendUserResponse } from "../services/socket";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 // The browser viewport the server uses (agent-browser default)
@@ -41,8 +41,11 @@ export function LiveViewScreen() {
   const result = useAgentStore((s) => s.result);
   const error = useAgentStore((s) => s.error);
   const goal = useAgentStore((s) => s.goal);
+  const pendingQuestion = useAgentStore((s) => s.pendingQuestion);
+  const pendingOptions = useAgentStore((s) => s.pendingOptions);
 
   const [typeText, setTypeText] = useState("");
+  const [answerText, setAnswerText] = useState("");
 
   // The screenshot shown: when paused use the interactive one, else the latest agent screenshot
   const displayedScreenshot = interactiveScreenshot ?? screenshotBase64;
@@ -79,6 +82,20 @@ export function LiveViewScreen() {
       { text: "Cancel", style: "cancel" },
       { text: "Stop", style: "destructive", onPress: () => { stopRun(); } },
     ]);
+  };
+
+  // ── Feedback loop: send answer to the agent ──
+  const handleSendAnswer = (answer: string) => {
+    if (!answer.trim()) return;
+    sendUserResponse(answer.trim());
+    setAnswerText("");
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
+  const handleSkipQuestion = () => {
+    sendUserResponse("(skipped — please proceed with your best judgment)");
+    setAnswerText("");
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const latestStep = steps[currentStep - 1];
@@ -193,6 +210,62 @@ export function LiveViewScreen() {
             </GlassCard>
           )}
 
+          {/* ── Feedback Loop: Question Card (visible when LLM asks the user) ── */}
+          {status === "waiting_for_user" && pendingQuestion && (
+            <GlassCard style={styles.askCard} glowColor={Colors.purple}>
+              <View style={styles.askHeader}>
+                <Text style={styles.askIcon}>❓</Text>
+                <Text style={styles.askLabel}>Agent needs your help</Text>
+              </View>
+              <Text style={styles.askQuestion}>{pendingQuestion}</Text>
+
+              {/* Quick-tap option buttons */}
+              {pendingOptions.length > 0 && (
+                <View style={styles.optionsRow}>
+                  {pendingOptions.map((opt, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={styles.optionBtn}
+                      activeOpacity={0.7}
+                      onPress={() => handleSendAnswer(opt)}
+                    >
+                      <Text style={styles.optionText}>{opt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Free-text answer input */}
+              <View style={styles.answerRow}>
+                <TextInput
+                  style={styles.answerInput}
+                  placeholder="Or type your answer..."
+                  placeholderTextColor={Colors.textMuted}
+                  value={answerText}
+                  onChangeText={setAnswerText}
+                  onSubmitEditing={() => handleSendAnswer(answerText)}
+                  returnKeyType="send"
+                  autoFocus={true}
+                />
+                <TouchableOpacity
+                  style={styles.answerSendBtn}
+                  onPress={() => handleSendAnswer(answerText)}
+                >
+                  <Send size={18} color={Colors.purple} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Skip button */}
+              <TouchableOpacity
+                style={styles.skipBtn}
+                onPress={handleSkipQuestion}
+                activeOpacity={0.6}
+              >
+                <Text style={styles.skipText}>Skip — let agent decide</Text>
+              </TouchableOpacity>
+            </GlassCard>
+          )}
+
           {/* ── Result / Error card ── */}
           {(status === "done" || status === "error" || status === "max_steps") && (
             <GlassCard
@@ -231,7 +304,7 @@ export function LiveViewScreen() {
         </ScrollView>
 
         {/* ── Floating Control Bar ── */}
-        {(status === "running" || status === "paused") && (
+        {(status === "running" || status === "paused" || status === "waiting_for_user") && (
           <View style={[styles.controlBar, { paddingBottom: insets.bottom + 12 }]}>
           <GlassCard style={styles.controls} innerStyle={{ padding: 8 }} glowColor={Colors.border}>
               <View style={styles.controlsInner}>
@@ -275,15 +348,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 12,
     gap: 12,
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  stepCounter: { color: Colors.textSecondary, fontSize: 13 },
+  stepCounter: { color: Colors.textSecondary, fontSize: 13, fontWeight: "600" },
   progressBar: {
     flex: 1,
-    height: 3,
-    backgroundColor: Colors.bgGlass,
+    height: 4,
+    backgroundColor: "#E2E8F0",
     borderRadius: 2,
     overflow: "hidden",
   },
@@ -293,23 +366,24 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   goalText: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    marginBottom: 12,
-    lineHeight: 18,
+    color: Colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "500",
+    marginBottom: 16,
+    lineHeight: 19,
   },
-  screenshotCard: { marginBottom: 12, padding: 0, overflow: "hidden" },
+  screenshotCard: { marginBottom: 16, padding: 0, overflow: "hidden" },
   pausedBanner: {
-    backgroundColor: "rgba(246,173,85,0.15)",
+    backgroundColor: "#FEF3C7",
     borderBottomWidth: 1,
-    borderColor: Colors.amber + "40",
-    padding: 10,
+    borderColor: "rgba(217,119,6,0.15)",
+    padding: 12,
     alignItems: "center",
   },
-  pausedBannerText: { color: Colors.amber, fontSize: 12, fontWeight: "600" },
+  pausedBannerText: { color: "#D97706", fontSize: 12, fontWeight: "600" },
   imageContainer: {
     width: "100%",
-    backgroundColor: "#0A0F1A",
+    backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -329,32 +403,32 @@ const styles = StyleSheet.create({
   metaStrip: {
     flexDirection: "row",
     gap: 16,
-    padding: 10,
+    padding: 12,
     borderTopWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.bgCard,
   },
   metaText: { color: Colors.textMuted, fontSize: 11 },
-  typeCard: { marginBottom: 12 },
-  typeLabel: { color: Colors.amber, fontSize: 11, fontWeight: "600", marginBottom: 8 },
+  typeCard: { marginBottom: 16 },
+  typeLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: "600", marginBottom: 8 },
   typeRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    borderRadius: 10,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.amber + "44",
+    borderColor: Colors.border,
     paddingHorizontal: 12,
   },
   typeInput: {
     flex: 1,
     color: Colors.textPrimary,
     fontSize: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   sendBtn: { padding: 6 },
-  resultCard: { marginBottom: 16 },
+  resultCard: { marginBottom: 20 },
   resultTitle: { color: Colors.green, fontSize: 15, fontWeight: "700", marginBottom: 8 },
   errorTitle: { color: Colors.red, fontSize: 15, fontWeight: "700", marginBottom: 8 },
   resultText: { color: Colors.textSecondary, fontSize: 13, lineHeight: 20 },
@@ -362,8 +436,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 10,
-    marginTop: 4,
+    marginBottom: 12,
+    marginTop: 8,
   },
   sectionLabel: {
     color: Colors.textSecondary,
@@ -379,9 +453,77 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 16,
     paddingTop: 8,
-    backgroundColor: "rgba(7,11,20,0.85)",
+    backgroundColor: "rgba(248,250,252,0.92)",
   },
-  controls: { padding: 0 },
+  controls: { padding: 0, elevation: 8, shadowColor: "#0F172A", shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.05, shadowRadius: 12 },
   controlsInner: { flexDirection: "row", gap: 10 },
   controlBtn: { flex: 1 },
+  // ── Feedback loop question card styles ──
+  askCard: { marginBottom: 16 },
+  askHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  askIcon: { fontSize: 20 },
+  askLabel: {
+    color: Colors.purple,
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+  askQuestion: {
+    color: Colors.textPrimary,
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 14,
+  },
+  optionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  optionBtn: {
+    backgroundColor: "#E0E7FF",
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  optionText: {
+    color: "#4F46E5",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  answerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  answerInput: {
+    flex: 1,
+    color: Colors.textPrimary,
+    fontSize: 14,
+    paddingVertical: 12,
+  },
+  answerSendBtn: { padding: 6 },
+  skipBtn: {
+    alignSelf: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  skipText: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontStyle: "italic",
+  },
 });
