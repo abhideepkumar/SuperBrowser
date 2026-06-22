@@ -4,6 +4,7 @@
   "description": "AI Browser Automation Platform powered by agent-browser + LLM adapter pattern",
   "type": "module",
   "scripts": {
+    "start": "npx tsx src/server.ts",
     "agent": "npx tsx src/cli.ts",
     "server": "npx tsx src/server.ts"
   },
@@ -12,7 +13,8 @@
     "dotenv": "^16.4.0",
     "express": "^4.19.2",
     "cors": "^2.8.5",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.7.5",
+    "agent-browser": "latest"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

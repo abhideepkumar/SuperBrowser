@@ -9,7 +9,7 @@ export interface BrowserResult {
 }
 
 /**
- * Run an agent-browser CLI command and return its result.
+ * Run an npx agent-browser CLI command and return its result.
  *
  * @param command    - The full command string to execute
  * @param timeoutMs  - Hard timeout in milliseconds
@@ -63,7 +63,7 @@ function runCmd(command: string, timeoutMs: number = 30000): Promise<BrowserResu
 }
 
 /**
- * Build the --session flag string for agent-browser commands.
+ * Build the --session flag string for npx agent-browser commands.
  * Using named sessions ensures complete isolation between concurrent runs.
  */
 function sessionFlag(sessionId: string): string {
@@ -79,7 +79,7 @@ export function openUrl(
   url: string,
   sessionId: string = "default"
 ): Promise<BrowserResult> {
-  return runCmd(`agent-browser ${sessionFlag(sessionId)} open "${url}"`, 15000);
+  return runCmd(`npx agent-browser ${sessionFlag(sessionId)} open "${url}"`, 15000);
 }
 
 /**
@@ -88,7 +88,7 @@ export function openUrl(
 export function snapshot(
   sessionId: string = "default"
 ): Promise<BrowserResult> {
-  return runCmd(`agent-browser ${sessionFlag(sessionId)} snapshot -i`, 15000);
+  return runCmd(`npx agent-browser ${sessionFlag(sessionId)} snapshot -i`, 15000);
 }
 
 /**
@@ -103,7 +103,7 @@ export function screenshot(
     fs.mkdirSync(dir, { recursive: true });
   }
   return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} screenshot --annotate "${savePath}"`,
+    `npx agent-browser ${sessionFlag(sessionId)} screenshot --annotate "${savePath}"`,
     15000
   );
 }
@@ -116,7 +116,7 @@ export function click(
   sessionId: string = "default"
 ): Promise<BrowserResult> {
   return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} click "${ref}"`,
+    `npx agent-browser ${sessionFlag(sessionId)} click "${ref}"`,
     10000
   );
 }
@@ -131,7 +131,7 @@ export function fill(
 ): Promise<BrowserResult> {
   const escaped = value.replace(/"/g, '\\"');
   return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} fill "${ref}" "${escaped}"`,
+    `npx agent-browser ${sessionFlag(sessionId)} fill "${ref}" "${escaped}"`,
     10000
   );
 }
@@ -146,7 +146,7 @@ export function selectOption(
 ): Promise<BrowserResult> {
   const escaped = value.replace(/"/g, '\\"');
   return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} select "${ref}" "${escaped}"`,
+    `npx agent-browser ${sessionFlag(sessionId)} select "${ref}" "${escaped}"`,
     10000
   );
 }
@@ -159,7 +159,7 @@ export function scroll(
   sessionId: string = "default"
 ): Promise<BrowserResult> {
   return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} scroll ${direction} 600`,
+    `npx agent-browser ${sessionFlag(sessionId)} scroll ${direction} 600`,
     10000
   );
 }
@@ -171,7 +171,7 @@ export function close(
   sessionId: string = "default"
 ): Promise<BrowserResult> {
   return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} close`,
+    `npx agent-browser ${sessionFlag(sessionId)} close`,
     10000
   );
 }
@@ -192,7 +192,7 @@ export function clickAtCoordinates(
   yFrac: number,
   sessionId: string = "default"
 ): Promise<BrowserResult> {
-  // Default agent-browser viewport dimensions
+  // Default npx agent-browser viewport dimensions
   const viewW = 1280;
   const viewH = 720;
   const x = Math.round(Math.max(0, Math.min(1, xFrac)) * viewW);
@@ -214,7 +214,7 @@ export function clickAtCoordinates(
 
   const escaped = js.replace(/"/g, '\\"');
   return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} execute "${escaped}"`,
+    `npx agent-browser ${sessionFlag(sessionId)} execute "${escaped}"`,
     10000
   );
 }
@@ -252,7 +252,7 @@ export function typeAtFocus(
 
   const escaped = js.replace(/"/g, '\\"');
   return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} execute "${escaped}"`,
+    `npx agent-browser ${sessionFlag(sessionId)} execute "${escaped}"`,
     10000
   );
 }
