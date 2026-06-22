@@ -117,6 +117,10 @@ app.use(express.json());
 
 // ─── REST API ────────────────────────────────────────────────────
 
+app.get("/", (_req: Request, res: Response) => {
+  res.send("SuperBrowser Backend is running! 🚀");
+});
+
 /**
  * GET /api/health
  * Quick health check with active config info.
