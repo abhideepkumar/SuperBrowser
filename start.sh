@@ -1,22 +1,9 @@
 #!/bin/bash
-# When PLAYWRIGHT_BROWSERS_PATH=0, Playwright installs Chromium locally
-# inside the project dir (./ms-playwright/), which persists to runtime on Render.
-CHROME_PATH=$(find ./ms-playwright -name "chrome" -type f 2>/dev/null | head -1)
+# SuperBrowser production start script
+# Uses Browserless (remote browser) — no local Chromium required.
+# Set AGENT_BROWSER_PROVIDER=browserless and BROWSERLESS_API_KEY in Render env vars.
 
-if [ -z "$CHROME_PATH" ]; then
-  # Fallback: search the full project tree
-  CHROME_PATH=$(find /opt/render/project -name "chrome" -type f 2>/dev/null | head -1)
-fi
+set -e
 
-if [ -z "$CHROME_PATH" ]; then
-  echo "❌ Chrome binary not found. Make sure build command ran: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium"
-  exit 1
-fi
-
-echo "✅ Chrome found at: $CHROME_PATH"
-export AGENT_BROWSER_EXECUTABLE_PATH="$CHROME_PATH"
-
-# --no-sandbox is required in cloud/containerized environments (no root access)
-export AGENT_BROWSER_ARGS="--no-sandbox,--disable-setuid-sandbox"
-
+echo "🚀 Starting SuperBrowser Server..."
 npx tsx src/server.ts

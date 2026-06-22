@@ -1,0 +1,4 @@
+{
+  "provider": "browserless",
+  "args": "--no-sandbox,--disable-setuid-sandbox"
+}
