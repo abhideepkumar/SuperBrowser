@@ -1,6 +1,10 @@
-import { spawn } from "child_process";
+import { execFile } from "child_process";
+import * as util from "util";
 import * as fs from "fs";
 import * as path from "path";
+import { substituteAll } from "./credentials.js";
+
+const execFileAsync = util.promisify(execFile);
 
 export interface BrowserResult {
   success: boolean;
@@ -8,251 +12,189 @@ export interface BrowserResult {
   error?: string;
 }
 
-/**
- * Run an agent-browser CLI command and return its result.
- *
- * @param command    - The full command string to execute
- * @param timeoutMs  - Hard timeout in milliseconds
- */
-function runCmd(command: string, timeoutMs: number = 30000): Promise<BrowserResult> {
-  return new Promise((resolve) => {
-    const child = spawn(command, {
-      shell: true,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+export interface SnapshotResult extends BrowserResult {}
 
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout.on("data", (data) => { stdout += data.toString(); });
-    child.stderr.on("data", (data) => { stderr += data.toString(); });
-
-    let timer: NodeJS.Timeout | null = setTimeout(() => {
-      timer = null;
-      child.kill();
-      resolve({
-        success: false,
-        output: stdout.trim(),
-        error: "Command timed out",
-      });
-    }, timeoutMs);
-
-    // Use 'exit' (not 'close') so we don't wait for background daemon handles
-    child.on("exit", (code, signal) => {
-      if (timer) clearTimeout(timer);
-      if (code === 0) {
-        resolve({ success: true, output: stdout.trim() });
-      } else {
-        resolve({
-          success: false,
-          output: stdout.trim(),
-          error: stderr.trim() || `Exit code ${code}, signal ${signal}`,
-        });
-      }
-    });
-
-    child.on("error", (err) => {
-      if (timer) clearTimeout(timer);
-      resolve({
-        success: false,
-        output: stdout.trim(),
-        error: err.message,
-      });
-    });
-  });
+function sessionArgs(sessionId?: string): string[] {
+  return ["--session-name", sessionId || "default"];
 }
 
 /**
- * Build the --session flag string for agent-browser commands.
- * Using named sessions ensures complete isolation between concurrent runs.
+ * Executes agent-browser CLI using safely escaped argument arrays.
+ * Bypasses string interpolation to completely eliminate shell injection risks.
  */
-function sessionFlag(sessionId: string): string {
-  return `--session "${sessionId}"`;
-}
-
-// ─── Standard Browser Actions ────────────────────────────────────
-
-/**
- * Navigate to a URL.
- */
-export function openUrl(
-  url: string,
-  sessionId: string = "default"
+async function runCmd(
+  args: string[],
+  timeoutMs: number = 25000
 ): Promise<BrowserResult> {
-  return runCmd(`agent-browser ${sessionFlag(sessionId)} open "${url}"`, 15000);
-}
-
-/**
- * Capture an accessibility-tree snapshot of the current page.
- */
-export function snapshot(
-  sessionId: string = "default"
-): Promise<BrowserResult> {
-  return runCmd(`agent-browser ${sessionFlag(sessionId)} snapshot -i`, 15000);
-}
-
-/**
- * Capture an annotated screenshot and save it to the given path.
- */
-export function screenshot(
-  savePath: string,
-  sessionId: string = "default"
-): Promise<BrowserResult> {
-  const dir = path.dirname(savePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  try {
+    const cmd = process.platform === "win32" ? "agent-browser.cmd" : "agent-browser";
+    const { stdout, stderr } = await execFileAsync(cmd, args, { 
+      timeout: timeoutMs,
+      shell: process.platform === "win32" // required on Windows for .cmd, Node safely escapes the args array
+    });
+    
+    if (stderr && stderr.toLowerCase().includes("error")) {
+      return { success: false, output: stdout, error: stderr };
+    }
+    return { success: true, output: stdout };
+  } catch (err: any) {
+    return {
+      success: false,
+      output: err.stdout || "",
+      error: err.stderr || err.message || "Unknown error",
+    };
   }
-  return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} screenshot --annotate "${savePath}"`,
-    15000
-  );
 }
 
 /**
- * Click on an element by its @e reference.
+ * Initialize a browser session.
  */
-export function click(
-  ref: string,
-  sessionId: string = "default"
-): Promise<BrowserResult> {
-  return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} click "${ref}"`,
-    10000
-  );
-}
-
-/**
- * Fill an input field by its @e reference.
- */
-export function fill(
-  ref: string,
-  value: string,
-  sessionId: string = "default"
-): Promise<BrowserResult> {
-  const escaped = value.replace(/"/g, '\\"');
-  return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} fill "${ref}" "${escaped}"`,
-    10000
-  );
-}
-
-/**
- * Select an option from a dropdown by its @e reference.
- */
-export function selectOption(
-  ref: string,
-  value: string,
-  sessionId: string = "default"
-): Promise<BrowserResult> {
-  const escaped = value.replace(/"/g, '\\"');
-  return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} select "${ref}" "${escaped}"`,
-    10000
-  );
-}
-
-/**
- * Scroll the page in a direction.
- */
-export function scroll(
-  direction: "up" | "down" = "down",
-  sessionId: string = "default"
-): Promise<BrowserResult> {
-  return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} scroll ${direction} 600`,
-    10000
-  );
+export function initBrowser(sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "open", "about:blank"]);
 }
 
 /**
  * Close the browser session.
  */
-export function close(
-  sessionId: string = "default"
-): Promise<BrowserResult> {
-  return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} close`,
-    10000
-  );
-}
-
-// ─── Interactive Fallback Actions (Human-in-the-Loop) ────────────
-
-/**
- * Click at fractional page coordinates (Human-in-the-Loop).
- *
- * xFrac and yFrac are values from 0.0 to 1.0 representing the tap position
- * as a fraction of the browser viewport (default 1280×720).
- *
- * The element under the calculated pixel coordinate is focused and clicked.
- * A new snapshot should be taken immediately after to reflect the updated state.
- */
-export function clickAtCoordinates(
-  xFrac: number,
-  yFrac: number,
-  sessionId: string = "default"
-): Promise<BrowserResult> {
-  // Default agent-browser viewport dimensions
-  const viewW = 1280;
-  const viewH = 720;
-  const x = Math.round(Math.max(0, Math.min(1, xFrac)) * viewW);
-  const y = Math.round(Math.max(0, Math.min(1, yFrac)) * viewH);
-
-  // Use elementFromPoint to find and interact with the element at these coords.
-  // We dispatch both a mousedown/mouseup sequence AND .click() for maximum
-  // compatibility across different frameworks (React, Angular, vanilla JS).
-  const js = [
-    `(function(){`,
-    `  var el = document.elementFromPoint(${x}, ${y});`,
-    `  if (!el) return;`,
-    `  el.focus();`,
-    `  el.dispatchEvent(new MouseEvent('mousedown', {bubbles:true, clientX:${x}, clientY:${y}}));`,
-    `  el.dispatchEvent(new MouseEvent('mouseup',   {bubbles:true, clientX:${x}, clientY:${y}}));`,
-    `  el.click();`,
-    `})()`,
-  ].join(" ");
-
-  const escaped = js.replace(/"/g, '\\"');
-  return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} execute "${escaped}"`,
-    10000
-  );
+export function close(sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "close"]);
 }
 
 /**
- * Type text into the currently focused element (Human-in-the-Loop).
- *
- * Dispatches native input/change events after setting the value so that
- * React, Vue, and Angular controlled inputs respond correctly.
- * For contenteditable elements, falls back to document.execCommand insertText.
+ * Close all active sessions.
  */
-export function typeAtFocus(
-  text: string,
+export function closeAllBrowsers(): Promise<BrowserResult> {
+  return runCmd(["close", "--all"]);
+}
+
+/**
+ * Open a specific URL.
+ */
+export function openUrl(url: string, sessionId: string = "default"): Promise<BrowserResult> {
+  const safeUrl = substituteAll(url);
+  return runCmd([...sessionArgs(sessionId), "open", safeUrl]);
+}
+
+/**
+ * Take an accessibility tree snapshot (interactive elements only).
+ */
+export function snapshot(sessionId: string = "default"): Promise<SnapshotResult> {
+  return runCmd([...sessionArgs(sessionId), "snapshot", "-i"]);
+}
+
+/**
+ * Save a screenshot to disk.
+ */
+export function screenshot(filepath: string, sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "screenshot", filepath]);
+}
+
+/**
+ * Execute arbitrary JavaScript in the page context.
+ */
+export function execute(js: string, sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "eval", js]);
+}
+
+// ─── Interaction Commands ────────────────────────────────────────
+
+export function click(ref: string, sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "click", ref]);
+}
+
+export function fill(ref: string, text: string, sessionId: string = "default"): Promise<BrowserResult> {
+  const safeText = substituteAll(text);
+  
+  if (safeText.length > 5000 && process.platform === "win32") {
+    console.warn("⚠️ WARNING: Payload exceeds 5000 chars. This may fail on Windows due to cmd.exe limits.");
+  }
+  
+  return runCmd([...sessionArgs(sessionId), "fill", ref, safeText]);
+}
+
+export function selectOption(ref: string, value: string, sessionId: string = "default"): Promise<BrowserResult> {
+  const safeValue = substituteAll(value);
+  return runCmd([...sessionArgs(sessionId), "select", ref, safeValue]);
+}
+
+export function hover(ref: string, sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "hover", ref]);
+}
+
+export function scrollIntoView(ref: string, sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "scrollintoview", ref]);
+}
+
+export function waitForElement(selector: string, timeoutMs: number = 5000, sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "wait", selector], timeoutMs + 2000);
+}
+
+export function pressKey(key: string, sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "press", key]);
+}
+
+export function clear(ref: string, sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "fill", ref, ""]);
+}
+
+export function uploadFile(ref: string, filePath: string, sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "upload", ref, filePath], 30000);
+}
+
+export function dragDrop(fromRef: string, toRef: string, sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "drag", fromRef, toRef]);
+}
+
+export function scroll(direction: "up" | "down", sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "scroll", direction]);
+}
+
+export function clickAtCoordinates(x: number, y: number, sessionId: string = "default"): Promise<BrowserResult> {
+  const js = `document.elementFromPoint(${x}, ${y})?.click()`;
+  return execute(js, sessionId);
+}
+
+export function typeAtFocus(text: string, sessionId: string = "default"): Promise<BrowserResult> {
+  return runCmd([...sessionArgs(sessionId), "keyboard", "type", text]);
+}
+
+// ─── Custom Extraction Commands ──────────────────────────────────
+
+/**
+ * Extract an HTML table as structured JSON.
+ * Returns JSON array string mapped to headers.
+ */
+export async function extractTable(
+  selector: string,
   sessionId: string = "default"
-): Promise<BrowserResult> {
-  // Escape backslashes and double quotes for shell safety
-  const safeText = text.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+): Promise<BrowserResult & { tableData?: Record<string, string>[] }> {
+  const js = `(function() {
+    var table = document.querySelector('${selector}');
+    if (!table) return JSON.stringify({ error: 'Table not found' });
+    var headers = Array.from(table.querySelectorAll('thead th, thead td, tr:first-child th, tr:first-child td'))
+      .map(th => th.textContent.trim());
+    var rows = Array.from(table.querySelectorAll('tbody tr, tr:not(:first-child)'));
+    var data = rows.map(row => {
+      var cells = Array.from(row.querySelectorAll('td, th'));
+      var obj = {};
+      cells.forEach((cell, i) => { obj[headers[i] || 'col' + i] = cell.textContent.trim(); });
+      return obj;
+    });
+    return JSON.stringify(data);
+  })()`;
 
-  const js = [
-    `(function(){`,
-    `  var el = document.activeElement;`,
-    `  if (!el) return;`,
-    `  if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {`,
-    `    var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value') || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');`,
-    `    if (nativeInputValueSetter && nativeInputValueSetter.set) nativeInputValueSetter.set.call(el, "${safeText}");`,
-    `    else el.value = "${safeText}";`,
-    `    el.dispatchEvent(new Event('input',  {bubbles:true}));`,
-    `    el.dispatchEvent(new Event('change', {bubbles:true}));`,
-    `  } else if (el.isContentEditable) {`,
-    `    document.execCommand('selectAll', false, null);`,
-    `    document.execCommand('insertText', false, "${safeText}");`,
-    `  }`,
-    `})()`,
-  ].join(" ");
-
-  const escaped = js.replace(/"/g, '\\"');
-  return runCmd(
-    `agent-browser ${sessionFlag(sessionId)} execute "${escaped}"`,
-    10000
+  const result = await runCmd(
+    [...sessionArgs(sessionId), "eval", js],
+    15000
   );
+
+  if (result.success && result.output) {
+    try {
+      const tableData = JSON.parse(result.output);
+      return { ...result, tableData };
+    } catch {
+      return { ...result, error: "Failed to parse table JSON" };
+    }
+  }
+  return result;
 }

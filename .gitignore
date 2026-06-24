@@ -4,4 +4,4 @@ dist/
 screenshots/
 logs/
 *.log
-.md
+*.md

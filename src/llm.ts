@@ -21,6 +21,7 @@ import type {
   LLMResponse,
   AgentAction,
 } from "./types.js";
+import { LLMResponseSchema } from "./schema.js";
 
 // Re-export types that agent.ts needs
 export type { AgentAction, LLMResponse };
@@ -136,11 +137,24 @@ export async function planActions(
       });
 
       try {
-        const parsed = JSON.parse(result.content) as LLMResponse;
-        if (!parsed.status) parsed.status = "error";
-        if (!parsed.actions) parsed.actions = [];
-        if (!parsed.reasoning) parsed.reasoning = "No reasoning provided.";
-        if (parsed.result === undefined) parsed.result = null;
+        const raw = JSON.parse(result.content);
+        const parseResult = LLMResponseSchema.safeParse(raw);
+
+        let parsed: LLMResponse;
+        if (parseResult.success) {
+          parsed = parseResult.data as LLMResponse;
+        } else {
+          // Schema validation failed — log the issues and return a clean error
+          const issues = parseResult.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; ");
+          logger.log("⚠️", `LLM response failed schema validation: ${issues}`);
+          parsed = {
+            reasoning: `LLM response schema validation failed: ${issues}`,
+            status: "error",
+            actions: [],
+            result: null,
+          };
+        }
+
         parsed._raw = result.content;
         parsed._usedVision = includeImage;
         parsed._provider = result.provider;
@@ -150,7 +164,7 @@ export async function planActions(
         return parsed;
       } catch {
         return {
-          reasoning: `Failed to parse LLM response: ${result.content}`,
+          reasoning: `Failed to parse LLM response as JSON: ${result.content.substring(0, 200)}`,
           status: "error",
           actions: [],
           result: null,

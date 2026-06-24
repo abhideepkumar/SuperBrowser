@@ -10,7 +10,7 @@ import * as path from "path";
 import * as browser from "./browser.js";
 import { planActions, type AgentAction } from "./llm.js";
 import { SYSTEM_PROMPT } from "./prompt.js";
-import { substituteCredentials, sanitizeGoal } from "./credentials.js";
+import { substituteAll, sanitizeGoal } from "./credentials.js";
 import { config } from "dotenv";
 import type { RunLogger } from "./logger.js";
 
@@ -117,6 +117,31 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// ─── Intelligence: Loop Detection ───────────────────────────────
+
+/**
+ * djb2 hash — produces a stable integer from the AX tree string.
+ * Fast and dependency-free. Used to detect identical page states.
+ */
+function hashPageState(str: string): number {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+  }
+  return hash;
+}
+
+const CAPTCHA_SIGNALS = [
+  "captcha", "hcaptcha", "recaptcha", "cloudflare",
+  "are you a robot", "verify you are human", "i'm not a robot",
+  "press and hold", "turnstile", "challenge",
+] as const;
+
+function detectCaptcha(snapshotText: string): boolean {
+  const lower = snapshotText.toLowerCase();
+  return CAPTCHA_SIGNALS.some((s) => lower.includes(s));
+}
+
 /**
  * Read a screenshot file and return it as a base64 string.
  * Returns undefined if the file doesn't exist or can't be read.
@@ -185,7 +210,7 @@ async function executeAction(
         logger.log("⚠️", "Fill action missing ref or value, skipping.");
         return false;
       }
-      const realValue = substituteCredentials(action.value);
+      const realValue = substituteAll(action.value);
       const display = realValue !== action.value ? "••••••••" : action.value;
       logger.log("⌨️", `Filling ${action.ref} with "${display}"`);
       emit(runConfig, {
@@ -277,6 +302,88 @@ async function executeAction(
       return result.success;
     }
 
+    case "hover": {
+      if (!action.ref) { logger.log("⚠️", "Hover missing ref."); return false; }
+      logger.log("🖱️", `Hovering ${action.ref}`);
+      emit(runConfig, { type: "action_executing", actionType: "hover", actionRef: action.ref });
+      const result = await browser.hover(action.ref, runId);
+      logger.logActionResult(`hover(${action.ref})`, result.success, result.output, result.error);
+      emit(runConfig, { type: "action_done", actionType: "hover", actionRef: action.ref, actionSuccess: result.success, error: result.error });
+      return result.success;
+    }
+
+    case "press_key": {
+      if (!action.value) { logger.log("⚠️", "press_key missing value."); return false; }
+      logger.log("⌨️", `Pressing key: ${action.value}`);
+      emit(runConfig, { type: "action_executing", actionType: "press_key", actionValue: action.value });
+      const result = await browser.pressKey(action.value, runId);
+      logger.logActionResult(`press_key(${action.value})`, result.success, result.output, result.error);
+      emit(runConfig, { type: "action_done", actionType: "press_key", actionValue: action.value, actionSuccess: result.success, error: result.error });
+      return result.success;
+    }
+
+    case "clear": {
+      if (!action.ref) { logger.log("⚠️", "Clear missing ref."); return false; }
+      logger.log("🗑️", `Clearing ${action.ref}`);
+      emit(runConfig, { type: "action_executing", actionType: "clear", actionRef: action.ref });
+      const result = await browser.clear(action.ref, runId);
+      logger.logActionResult(`clear(${action.ref})`, result.success, result.output, result.error);
+      emit(runConfig, { type: "action_done", actionType: "clear", actionRef: action.ref, actionSuccess: result.success, error: result.error });
+      return result.success;
+    }
+
+    case "drag_drop": {
+      if (!action.ref || !action.toRef) { logger.log("⚠️", "drag_drop missing ref or toRef."); return false; }
+      logger.log("🔀", `Dragging ${action.ref} → ${action.toRef}`);
+      emit(runConfig, { type: "action_executing", actionType: "drag_drop", actionRef: action.ref });
+      const result = await browser.dragDrop(action.ref, action.toRef, runId);
+      logger.logActionResult(`drag_drop(${action.ref}, ${action.toRef})`, result.success, result.output, result.error);
+      emit(runConfig, { type: "action_done", actionType: "drag_drop", actionRef: action.ref, actionSuccess: result.success, error: result.error });
+      return result.success;
+    }
+
+    case "upload": {
+      if (!action.ref || !action.value) { logger.log("⚠️", "Upload missing ref or path."); return false; }
+      logger.log("📤", `Uploading ${action.value} to ${action.ref}`);
+      emit(runConfig, { type: "action_executing", actionType: "upload", actionRef: action.ref, actionValue: action.value });
+      const result = await browser.uploadFile(action.ref, action.value, runId);
+      logger.logActionResult(`upload(${action.ref})`, result.success, result.output, result.error);
+      emit(runConfig, { type: "action_done", actionType: "upload", actionRef: action.ref, actionSuccess: result.success, error: result.error });
+      return result.success;
+    }
+
+    case "execute_js": {
+      if (!action.value) { logger.log("⚠️", "execute_js missing value."); return false; }
+      logger.log("🔧", `Executing JS: ${action.value.substring(0, 80)}...`);
+      emit(runConfig, { type: "action_executing", actionType: "execute_js", actionValue: action.value });
+      const result = await browser.execute(action.value, runId);
+      logger.logActionResult(`execute_js(...)`, result.success, result.output, result.error);
+      emit(runConfig, { type: "action_done", actionType: "execute_js", actionSuccess: result.success, error: result.error });
+      return result.success;
+    }
+
+    case "wait": {
+      if (!action.value) { logger.log("⚠️", "Wait missing selector value."); return false; }
+      const timeoutMs = action.timeout ?? 5000;
+      logger.log("⏳", `Waiting for ${action.value} (timeout: ${timeoutMs}ms)`);
+      const result = await browser.waitForElement(action.value, timeoutMs, runId);
+      logger.logActionResult(`wait(${action.value})`, result.success, result.output, result.error);
+      return result.success;
+    }
+
+    case "extract_table": {
+      if (!action.value) { logger.log("⚠️", "extract_table missing CSS selector."); return false; }
+      logger.log("📊", `Extracting table: ${action.value}`);
+      emit(runConfig, { type: "action_executing", actionType: "extract_table", actionValue: action.value });
+      const result = await browser.extractTable(action.value, runId);
+      logger.logActionResult(`extract_table(${action.value})`, result.success, result.output, result.error);
+      if (result.tableData) {
+        logger.log("📊", `Extracted ${result.tableData.length} rows from table.`);
+      }
+      emit(runConfig, { type: "action_done", actionType: "extract_table", actionValue: action.value, actionSuccess: result.success, error: result.error });
+      return result.success;
+    }
+
     default:
       logger.log("⚠️", `Unknown action type: ${(action as any).type}`);
       return false;
@@ -355,11 +462,16 @@ export async function runAgent(runConfig: AgentRunConfig): Promise<AgentRunResul
     await sleep(settleDelayMs);
   }
 
-  // ─── Main Loop ─────────────────────────────────────────────────
+    // ─── Main Loop ─────────────────────────────────────────────────
     let consecutiveSnapshotFailures = 0;
     const MAX_SNAPSHOT_FAILURES = 3;
+    // Loop detection state — tracks last 3 AX tree hashes to catch infinite loops
+    const recentPageHashes: number[] = [];
+    const MAX_IDENTICAL_STATES = 3;
     /** Holds the user's answer to inject into the next LLM call */
     let pendingUserAnswer: string | null = null;
+    /** Holds the last failed action description for self-correction injection */
+    let lastFailedAction: string | null = null;
 
     for (let step = 0; step < maxSteps; step++) {
     // Check abort signal
@@ -440,6 +552,38 @@ export async function runAgent(runConfig: AgentRunConfig): Promise<AgentRunResul
       snap.output.length > 8000
         ? snap.output.substring(0, 8000) + "\n\n[... snapshot truncated for token limit ...]"
         : snap.output;
+
+    // ── Intelligence: CAPTCHA fast-fail ────────────────────────────
+    if (detectCaptcha(snapshotText)) {
+      logger.log("🤖", "CAPTCHA / security challenge detected.");
+      const question = "I've encountered a CAPTCHA or security challenge. Please solve it in the browser window, then click Resume.";
+      emit(runConfig, { type: "ask_user", step: step + 1, question, screenshotBase64 });
+      if (runConfig.onAskUser) {
+        await runConfig.onAskUser(question, ["I've solved it — please continue"]);
+      }
+      pendingUserAnswer = null;
+      continue; // Re-snapshot after user solved it — no LLM call wasted
+    }
+
+    // ── Intelligence: Loop Detection ───────────────────────────────
+    const pageHash = hashPageState(snapshotText);
+    recentPageHashes.push(pageHash);
+    if (recentPageHashes.length > MAX_IDENTICAL_STATES) recentPageHashes.shift();
+
+    const isLooping =
+      recentPageHashes.length >= MAX_IDENTICAL_STATES &&
+      recentPageHashes.every((h) => h === recentPageHashes[0]);
+
+    if (isLooping) {
+      logger.log("🔄", `LOOP DETECTED: Page state unchanged for ${MAX_IDENTICAL_STATES} consecutive steps.`);
+      snapshotText = `⚠️ LOOP DETECTED: The page state has not changed in the last ${MAX_IDENTICAL_STATES} steps despite your actions. You MUST try a fundamentally different approach — different element, different action type, or navigate directly.\n\n${snapshotText}`;
+    }
+
+    // ── Intelligence: Failed Action Injection ──────────────────────
+    if (lastFailedAction) {
+      snapshotText = `⚠️ PREVIOUS ACTION FAILED: ${lastFailedAction}\nAnalyse the current page state and choose a different strategy.\n\n${snapshotText}`;
+      lastFailedAction = null; // consume
+    }
 
     // Inject the user's answer from a previous ask_user round
     if (pendingUserAnswer) {
@@ -578,6 +722,7 @@ export async function runAgent(runConfig: AgentRunConfig): Promise<AgentRunResul
       if (abortSignal?.aborted) break;
       const ok = await executeAction(action, runConfig);
       if (!ok) {
+        lastFailedAction = `${action.type}(${action.ref ?? action.toRef ?? action.value ?? ""}) failed`;
         logger.log("⚠️", "Action failed. Will re-snapshot and retry on next loop.");
       }
       await sleep(actionDelayMs);

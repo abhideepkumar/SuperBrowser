@@ -73,9 +73,27 @@ export interface LLMProvider {
  * A browser action that the LLM has decided to execute.
  */
 export interface AgentAction {
-  type: "click" | "fill" | "select" | "navigate" | "scroll";
+  type:
+    | "click"
+    | "fill"
+    | "select"
+    | "navigate"
+    | "scroll"
+    | "hover"
+    | "wait"
+    | "upload"
+    | "extract_table"
+    | "scrape_to_cloud"
+    | "assert_visible"
+    | "press_key"
+    | "clear"
+    | "drag_drop"
+    | "execute_js";
   ref?: string;
   value?: string;
+  toRef?: string;
+  timeout?: number;
+  destination?: string;
 }
 
 /**

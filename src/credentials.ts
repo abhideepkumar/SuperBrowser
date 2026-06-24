@@ -11,14 +11,8 @@ interface CredentialSet {
  * Any env var starting with CRED_ is treated as a credential:
  *   CRED_EMAIL=user@example.com    → placeholder {{EMAIL}}
  *   CRED_PASSWORD=secret123        → placeholder {{PASSWORD}}
- *
- * Called lazily (not cached) so that runtime credential updates
- * from the Settings screen take effect immediately without restart.
  */
 function loadCredentials(): CredentialSet {
-  // Do NOT call config() here again — it does a synchronous disk read.
-  // Runtime updates from POST /api/config write directly to process.env,
-  // which we read below. The top-level config() at module load is enough.
   const creds: CredentialSet = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (key.startsWith("CRED_") && value) {
@@ -30,11 +24,27 @@ function loadCredentials(): CredentialSet {
 }
 
 /**
- * Substitute credential placeholders in a string with real values.
- * e.g., fill(@e3, "{{EMAIL}}") → fill(@e3, "user@example.com")
+ * Load DATA_* variables (large data payloads for form filling).
  *
- * Called per browser action. Credentials are loaded fresh each time
- * so that runtime updates (from the Settings screen) take effect.
+ * Any env var starting with DATA_ is treated as big data payload:
+ *   DATA_ARTICLE=My 5000-word article... → placeholder {{DATA_ARTICLE}}
+ *
+ * This keeps massive payloads out of the LLM context window.
+ */
+function loadDataVariables(): CredentialSet {
+  const data: CredentialSet = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key.startsWith("DATA_") && value) {
+      const placeholder = `{{${key}}}`;
+      data[placeholder] = value;
+    }
+  }
+  return data;
+}
+
+/**
+ * Substitute ONLY credential placeholders.
+ * Used internally, or for scenarios where DATA variables shouldn't be substituted.
  */
 export function substituteCredentials(value: string): string {
   const credentials = loadCredentials();
@@ -46,33 +56,62 @@ export function substituteCredentials(value: string): string {
 }
 
 /**
+ * Substitute BOTH credentials AND data variables in a value string.
+ * Called by browser.fill() — NOT by the LLM context builder.
+ */
+export function substituteAll(value: string): string {
+  // Apply credentials first (they mask values)
+  let result = substituteCredentials(value);
+  // Then apply data variables
+  const dataVars = loadDataVariables();
+  for (const [placeholder, realValue] of Object.entries(dataVars)) {
+    result = result.replaceAll(placeholder, realValue);
+  }
+  return result;
+}
+
+/**
  * Build a sanitized version of the user goal that replaces any raw
  * credential values with their placeholders, so the LLM never sees
  * passwords or emails in plain text.
+ * 
+ * Also replaces massive DATA variables with their placeholders to 
+ * prevent token bloat in the prompt.
  */
 export function sanitizeGoal(goal: string): string {
-  const credentials = loadCredentials();
   let sanitized = goal;
+  
+  // Existing credential masking ({{EMAIL}})
+  const credentials = loadCredentials();
   for (const [placeholder, realValue] of Object.entries(credentials)) {
     if (realValue && sanitized.includes(realValue)) {
-      sanitized = sanitized.replace(
-        new RegExp(escapeRegex(realValue), "g"),
-        placeholder
-      );
+      sanitized = sanitized.replaceAll(realValue, placeholder);
     }
   }
+
+  // Data variable masking ({{DATA_ARTICLE}})
+  const dataVars = loadDataVariables();
+  for (const [placeholder, realValue] of Object.entries(dataVars)) {
+    if (realValue && sanitized.includes(realValue)) {
+      sanitized = sanitized.replaceAll(realValue, placeholder);
+    }
+  }
+
   return sanitized;
 }
 
 /**
- * Return all currently configured credentials as a map of
- * placeholder → masked value (for display in the settings UI).
- * Real values are never returned to the client.
+ * Return all currently configured credential keys (for the settings UI).
  */
 export function listCredentialKeys(): string[] {
   return Object.keys(loadCredentials());
 }
 
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * Return all currently configured data keys.
+ */
+export function listDataKeys(): string[] {
+  return Object.keys(loadDataVariables());
 }
+
+
