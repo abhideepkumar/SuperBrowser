@@ -21,7 +21,7 @@ interface SettingsState {
 const STORAGE_KEY = "superbrowser_settings";
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
-  serverUrl: "http://192.168.0.114:3000",
+  serverUrl: process.env.EXPO_PUBLIC_SERVER_URL || "https://superbrowser-1.onrender.com",
   provider: "openai",
   model: "gpt-4o",
   loaded: false,

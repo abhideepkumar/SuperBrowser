@@ -119,7 +119,7 @@ export function OnboardingScreen() {
                   setUrlInput(t);
                   setPingStatus("idle");
                 }}
-                placeholder="http://192.168.0.114:3000"
+                placeholder={process.env.EXPO_PUBLIC_SERVER_URL || "https://superbrowser-1.onrender.com"}
                 placeholderTextColor={Colors.textMuted}
                 autoCapitalize="none"
                 keyboardType="url"
